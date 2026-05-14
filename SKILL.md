@@ -72,7 +72,7 @@ Search for specific content with Grep tool instead of reading entire files.
 Use offset and limit parameters. Check file size with `wc -l` first.
 
 ### 6. Use Bash Commands Instead of Reading Files
-**CRITICAL OPTIMIZATION.** Reading files costs tokens. Bash commands don't.
+**CRITICAL OPTIMIZATION** for pure transformations and inspection. Reading files costs tokens; bash commands don't.
 
 | Operation | Wasteful | Efficient |
 |-----------|----------|-----------|
@@ -83,8 +83,14 @@ Use offset and limit parameters. Check file size with `wc -l` first.
 | Merge files | Read + Read + Write | `cat file1 file2 > combined` |
 | Count lines | Read file | `wc -l file` |
 | Check content | Read file | `grep -q "term" file` |
+| Inspect JSON | Read + parse mentally | `python3 -c "import json; ..."` or `jq` |
 
-**When to break this rule:** Complex logic, code-aware changes, validation needed, interactive review. For details, see [strategies.md](strategies.md).
+**When to break this rule — prefer Read + Edit instead:**
+- **Code edits** (`.py`, `.js`, `.xml`, `.ga`, `.tsx`, etc.) where the user benefits from seeing a reviewable diff. The cost of reading a small file is worth the reviewability.
+- **Validation matters** — when a syntactic mistake would corrupt the file (workflow JSON, config schemas).
+- **Interactive review** — the user explicitly wants to see what changed.
+
+The right framing is **scope-based** (see next section), not "always bash" or "always Read+Edit". For more detailed strategies and patterns, see [strategies.md](strategies.md).
 
 ### 7. Filter Command Output
 Limit scope: `head -50`, `find . -maxdepth 2`, `tree -L 2`.
@@ -110,6 +116,19 @@ Batch 3-5 related searches in parallel. Save results immediately. Document "not 
 For detailed strategies, bash patterns, and extensive examples, see [strategies.md](strategies.md).
 
 ---
+
+## Scope-Based Tool Selection
+
+The choice between bash and Read+Edit isn't about token cost alone — it's about whether the user benefits from seeing the change. Match the tool to the scope of work:
+
+| Scope | Preferred tool | Why |
+|---|---|---|
+| Read-only inspection of structured data (JSON, YAML, JSONL, large logs) | `python3 -c`, `jq`, `grep`, `awk` | Bash output is filterable; no risk of misediting source files. Inline `python3 -c` for JSON inspection is faster and cheaper than Read+parse. |
+| In-place edit of CODE (`.py`, `.js`, `.xml`, `.ga`, `.tsx`) | Read + Edit | User sees a reviewable diff; syntactic mistakes are caught early. |
+| Transformation of large data files (CSV, big JSON, BAM-derived TSV) | `sed`, `awk`, `python3` script | Reading the whole file would cost thousands of tokens. |
+| New file from scratch | Write tool | One round-trip; bash heredocs add no value and aren't reviewable. |
+
+**Quick rule**: if the user would want to see and approve the change, use Read+Edit. If it's pure data wrangling or inspection, use bash/python.
 
 ## Decision Tree for File Operations
 
