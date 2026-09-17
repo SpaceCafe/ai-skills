@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -Rs '{hookSpecificOutput: {hookEventName: \"SessionStart\", additionalContext: (\"Apply the writing-style skill below to all human-readable text you write this session (documentation, comments, commit messages, PR descriptions, emails, changelogs, etc). It is loaded automatically for every session, not only on request.\n\n\" + .)}}' \"${CLAUDE_PLUGIN_ROOT}/skills/writing-style/SKILL.md\" 2>/dev/null || true",
+            "statusMessage": "Loading writing-style guide"
+          }
+        ]
+      }
+    ]
+  }
+}
