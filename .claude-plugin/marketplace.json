@@ -1,0 +1,14 @@
+{
+  "name": "ai-skills",
+  "description": "SpaceCafe's custom skills for Claude Code.",
+  "owner": {
+    "name": "SpaceCafe"
+  },
+  "plugins": [
+    {
+      "name": "ai-skills",
+      "description": "Custom skills for Claude Code.",
+      "source": "."
+    }
+  ]
+}
