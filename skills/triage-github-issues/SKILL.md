@@ -86,7 +86,22 @@ definition here.)
    Filter out anything that already carries a `status:*` label — that's the signal an issue has been through this skill
    before. No separate tracking file needed; GitHub's own labels are the state.
 
-2. **Read the issue, and read the code it's about**
+2. **Dispatch one subagent per issue, if there are 2+**
+
+   Each issue's triage (steps 3-7 below) is independent of every other issue's, so with 2 or more untriaged issues,
+   triage them in parallel instead of one after another.
+
+   - Spawn one `general-purpose` subagent per issue, model `haiku` by default — triage is read-classify-write, not deep
+     reasoning. Escalate to `sonnet` for an issue whose scope is genuinely hard to judge from title + body alone.
+   - Cap concurrency at ~5-8 in flight at once (batches, not all-at-once) — GitHub's secondary rate limits apply to
+     `gh`/REST calls same as anything else.
+   - Give each subagent the issue number, title, and body, and have it run steps 3-7 below, ending with a one-line
+     result (number, title, assessment, labels applied) instead of its own report-back.
+   - **REQUIRED SUB-SKILL:** superpowers:dispatching-parallel-agents for prompt structure and aggregation mechanics.
+
+   With only one untriaged issue, skip dispatch and just run steps 3-7 directly.
+
+3. **Read the issue, and read the code it's about**
 
    ```bash
    gh issue view <n> --json body,comments
@@ -97,7 +112,7 @@ definition here.)
    Don't triage from the title alone. Open the relevant code before writing anything — the assessment later on is
    worthless if it's guessing.
 
-3. **Apply labels**
+4. **Apply labels**
 
     - One type label if a good fit (see [Common Labels](#common-labels) below) — skip it if nothing fits well; a wrong
       label is worse than no label.
@@ -110,7 +125,7 @@ definition here.)
    MCP: `mcp__github__issue_write` (method: update, labels) · REST:
    `gh api repos/{owner}/{repo}/issues/{number} -X PATCH -f 'labels[]=enhancement' -f 'labels[]=status:needs-review'`
 
-4. **Assign it**
+5. **Assign it**
 
    ```bash
    gh issue edit <n> --add-assignee @me
@@ -122,7 +137,7 @@ definition here.)
    `@me` resolves to whoever `gh` is authenticated as — MCP and REST need the actual username resolved first, there's no
    `@me` shorthand.
 
-5. **Check for relationships — lightly**
+6. **Check for relationships — lightly**
 
    One quick search, not an investigation:
 
@@ -135,7 +150,7 @@ definition here.)
    Only mention something in the comment if it's a genuinely obvious overlap (near-duplicate, or clearly blocks/depends
    on another open issue). If nothing jumps out, say so in one word and move on.
 
-6. **Post the triage comment**
+7. **Post the triage comment**
 
    ```markdown
    **Triage**
@@ -162,10 +177,11 @@ definition here.)
    MCP: `mcp__github__add_issue_comment` · REST:
    `gh api repos/{owner}/{repo}/issues/{number}/comments -X POST -f body=...`
 
-7. **Report back**
+8. **Report back**
 
-   A short table to the user: issue number, title, assessment, labels applied. Nothing else needs to happen here — the
-   next move is theirs, on GitHub, at whatever pace they want.
+   A short table to the user: issue number, title, assessment, labels applied — one row per issue, gathered from each
+   subagent's one-line result if step 2 dispatched, or from your own run if it didn't. Nothing else needs to happen
+   here — the next move is theirs, on GitHub, at whatever pace they want.
 
 ## Common Labels
 
