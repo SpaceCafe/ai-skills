@@ -39,6 +39,14 @@ export GUM_LOG_LEVEL
 sync_tmp_parent=""
 sync_worktree=""
 
+# Lock file edits go to a copy outside the working tree until the run ends.
+# 'git subtree add/merge' refuses to run while the working tree has any
+# modification, so writing the real lock file after the first entry would
+# block every later entry. Set in main, read by rewrite_lock_file, sync_entry
+# and finish_sync.
+pending_lock_dir=""
+pending_lock=""
+
 
 ## -----------------------------------------------------------------------------
 ## Helpers
@@ -86,17 +94,17 @@ require_commands() {
     fi
 }
 
-# Rewrite LOCK_FILE through a temp file, so a failing jq never truncates it.
-# All arguments go to jq; the lock file is appended as its input.
+# Rewrite the pending lock file through a temp file, so a failing jq never
+# truncates it. All arguments go to jq; the pending lock is appended as its input.
 rewrite_lock_file() {
     local tmp_lock
 
-    tmp_lock="$(mktemp "${LOCK_FILE}.XXXXXX")"
-    if ! jq "$@" "${LOCK_FILE}" >"${tmp_lock}"; then
+    tmp_lock="$(mktemp "${pending_lock}.XXXXXX")"
+    if ! jq "$@" "${pending_lock}" >"${tmp_lock}"; then
         rm -f -- "${tmp_lock}"
         return 1
     fi
-    mv -- "${tmp_lock}" "${LOCK_FILE}"
+    mv -- "${tmp_lock}" "${pending_lock}"
 }
 
 cleanup_worktree() {
@@ -108,6 +116,22 @@ cleanup_worktree() {
     fi
     sync_worktree=""
     sync_tmp_parent=""
+}
+
+# EXIT trap for sync mode. It also runs after a failed entry: the entries
+# merged before it are already committed, so the lock file and attribution
+# must still record them.
+finish_sync() {
+    cleanup_worktree
+    if [[ -n "${pending_lock}" && -f "${pending_lock}" ]]; then
+        mv -- "${pending_lock}" "${LOCK_FILE}"
+        generate_attribution
+    fi
+    if [[ -n "${pending_lock_dir}" ]]; then
+        rm -rf -- "${pending_lock_dir}"
+    fi
+    pending_lock=""
+    pending_lock_dir=""
 }
 
 
@@ -275,7 +299,6 @@ sync_entry() {
     # mid-sync failure from leaving anything staged.
     sync_tmp_parent="$(mktemp -d)"
     sync_worktree="${sync_tmp_parent}/wt"
-    trap cleanup_worktree EXIT
 
     git worktree add --detach --quiet -- "${sync_worktree}" "${resolved_commit}"
 
@@ -288,9 +311,8 @@ sync_entry() {
     )
 
     cleanup_worktree
-    trap - EXIT
 
-    if jq --exit-status --arg name "${name}" '.skills[$name]' "${LOCK_FILE}" >/dev/null; then
+    if jq --exit-status --arg name "${name}" '.skills[$name]' "${pending_lock}" >/dev/null; then
         git subtree merge --prefix="${local_path}" --message="Update vendored skill: ${name}" "${split_branch}"
     else
         git subtree add --prefix="${local_path}" --message="Add vendored skill: ${name}" "${split_branch}"
@@ -391,14 +413,22 @@ if [[ "${MODE}" == "sync" && -n "$(git status --porcelain)" ]]; then
     exit 1
 fi
 
-if [[ ! -f "${LOCK_FILE}" ]]; then
-    printf '{"skills": {}}\n' >"${LOCK_FILE}"
-fi
-
 if [[ "${MODE}" == "attribution" ]]; then
+    if [[ ! -f "${LOCK_FILE}" ]]; then
+        printf '{"skills": {}}\n' >"${LOCK_FILE}"
+    fi
     generate_attribution
     exit 0
 fi
+
+pending_lock_dir="$(mktemp -d)"
+pending_lock="${pending_lock_dir}/vendored-skills.lock.json"
+if [[ -f "${LOCK_FILE}" ]]; then
+    cp -- "${LOCK_FILE}" "${pending_lock}"
+else
+    printf '{"skills": {}}\n' >"${pending_lock}"
+fi
+trap finish_sync EXIT
 
 while IFS=$'\t' read -r name repo_url ref upstream_path local_path; do
     if [[ -n "${FILTER_NAME}" && "${FILTER_NAME}" != "${name}" ]]; then
@@ -411,5 +441,3 @@ done < <(jq --raw-output '.skills[] | [.name, .repoUrl, .ref, .upstreamPath, .lo
 if [[ -z "${FILTER_NAME}" ]]; then
     prune_stale_lock_entries
 fi
-
-generate_attribution
