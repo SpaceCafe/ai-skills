@@ -9,7 +9,8 @@ authorship (visible via `git log --follow <localPath>`).
 
 | Skill | Local Path | Source | Ref | Commit | Last Synced |
 |---|---|---|---|---|---|
-| token-efficiency | `skills/token-efficiency` | [https://github.com/Delphine-L/claude_global.git](https://github.com/Delphine-L/claude_global.git) (`skills/claude-meta/token-efficiency`) | main | `71c292e8aa6f` | 2026-09-19T08:51:46Z |
+| gitmoji | `skills/gitmoji` | [https://github.com/github/awesome-copilot.git](https://github.com/github/awesome-copilot.git) (`skills/gitmoji`) | main | `143a3d976b3c` | 2026-10-02T10:33:45Z |
+| token-efficiency | `skills/token-efficiency` | [https://github.com/Delphine-L/claude_global.git](https://github.com/Delphine-L/claude_global.git) (`skills/claude-meta/token-efficiency`) | main | `71c292e8aa6f` | 2026-10-02T10:32:19Z |
 
 > Please respect the license of each upstream repository when using
 > or redistributing these skills.
