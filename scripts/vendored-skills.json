@@ -6,6 +6,13 @@
       "ref": "main",
       "upstreamPath": "skills/claude-meta/token-efficiency",
       "localPath": "skills/token-efficiency"
+    },
+    {
+      "name": "gitmoji",
+      "repoUrl": "https://github.com/github/awesome-copilot.git",
+      "ref": "main",
+      "upstreamPath": "skills/gitmoji",
+      "localPath": "skills/gitmoji"
     }
   ]
 }
